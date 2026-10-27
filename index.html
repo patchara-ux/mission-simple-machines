@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mission Simple Machines: ภารกิจช่างกลกู้เมือง</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}body{font-family:Prompt,Sarabun,system-ui,sans-serif;background:linear-gradient(#4fc3f7,#d6f3ff 55%,#8bd05a 55%,#5aa83c);background-attachment:fixed;min-height:100vh;color:#1f2d4d;padding:12px}
+.card{background:#fff;border:4px solid #1f2d4d;border-radius:24px;box-shadow:0 6px 0 #1f2d4d;padding:18px;margin:10px auto;max-width:1100px}
+h1{font-size:clamp(26px,5vw,48px);font-weight:800}h2{font-size:clamp(22px,3.4vw,38px);font-weight:800}p,li{font-size:18px}
+.btn{font:800 22px Prompt,sans-serif;background:#ffb300;border:4px solid #1f2d4d;border-radius:18px;padding:14px 22px;box-shadow:0 5px 0 #1f2d4d;cursor:pointer;margin:8px 4px;color:#1f2d4d}.btn:active{transform:translateY(4px);box-shadow:0 1px 0 #1f2d4d}.btn:disabled{opacity:.4}
+.g{background:#43c463}.b{background:#4aa8ff}
+input{font:600 22px Prompt,sans-serif;padding:12px;border:4px solid #1f2d4d;border-radius:14px;width:100%;margin:6px 0}
+.opt{display:block;width:100%;font:800 clamp(18px,2.6vw,30px) Prompt,sans-serif;color:#fff;text-align:left;border:4px solid #1f2d4d;border-radius:20px;padding:16px;margin:10px 0;box-shadow:0 5px 0 #1f2d4d;cursor:pointer;text-shadow:0 2px 0 rgba(0,0,0,.3)}
+.opt.sel{outline:8px solid #fff;outline-offset:-12px}.opt.ok{outline:10px solid #fff700;outline-offset:-14px}.opt.no{opacity:.35}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}.team{border:4px solid #1f2d4d;border-radius:18px;padding:10px;color:#fff;font-weight:600;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.tag{display:inline-block;background:#1f2d4d;color:#fff;border-radius:99px;padding:4px 14px;font-size:16px;margin:2px}
+.bar{height:16px;background:#ddd;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:#ff5252;transition:width .3s}
+.big{font-size:clamp(60px,12vw,120px);font-weight:800}.c{text-align:center}.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.lb{display:flex;align-items:center;gap:8px;margin:6px 0}.lb b{min-width:200px}.lb i{display:block;height:26px;border-radius:8px;border:3px solid #1f2d4d}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1f2d4d;color:#fff;padding:10px 20px;border-radius:20px;display:none;z-index:9}
+</style></head><body><div id="app"></div><div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ===== ตั้งค่า: ใส่ Firebase Realtime Database URL ที่นี่ (ดูคู่มือ) เช่น "https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app"
+const FB_URL="";
+// ===== ข้อมูลด่านและโจทย์ [โจทย์, คำตอบที่ถูก, ตัวลวง1, ตัวลวง2, ตัวลวง3, เฉลย, ประเภท(จ=จำแนก ว=วิเคราะห์ ป=แก้ปัญหา)]
+const LV=[["🌉","สะพานคาน","คาน"],["🏗️","หอรอก","รอก"],["⛰️","เนินพื้นเอียง","พื้นเอียง"],["⚙️","โรงสีล้อและเพลา","ล้อและเพลา"],["⛏️","เหมืองลิ่มและสกรู","ลิ่มและสกรู"],["🐉","ด่านบอสรวมช่าง","ผสมผสาน"]];
+const TY={จ:"จำแนก",ว:"วิเคราะห์",ป:"แก้ปัญหา"};
+const Q=[
+["ไม้กระดานหก (จุดหมุนอยู่ตรงกลางระหว่างคนสองฝั่ง) จัดเป็นคานอันดับใด?","อันดับ 1","อันดับ 2","อันดับ 3","ไม่ใช่คาน","จุดหมุนอยู่ระหว่างแรงพยายามกับน้ำหนัก = คานอันดับ 1 เช่น กรรไกร ค้อนถอนตะปู","จ"],
+["รถเข็นทราย 1 ล้อ (ล้อเป็นจุดหมุน น้ำหนักอยู่กลาง ออกแรงที่มือ) เป็นคานอันดับใด?","อันดับ 2","อันดับ 1","อันดับ 3","ไม่ใช่คาน","น้ำหนักอยู่ระหว่างจุดหมุนกับแรงพยายาม = คานอันดับ 2 (ที่เปิดขวดก็เช่นกัน)","จ"],
+["เครื่องมือใดเป็นคานอันดับ 3 (แรงอยู่ระหว่างจุดหมุนกับน้ำหนัก)?","ตะเกียบ","กรรไกรตัดกระดาษ","ที่เปิดขวดน้ำอัดลม","ไม้กระดานหก","ตะเกียบมีจุดหมุนที่ปลายบน แรงจากนิ้วอยู่ตรงกลาง อาหารอยู่ปลายล่าง = อันดับ 3","จ"],
+["คานยาว 2 ม. มีจุดหมุนห่างน้ำหนัก 600 N เป็นระยะ 0.5 ม. ออกแรงที่ปลายอีกด้าน ต้องใช้แรงกี่นิวตัน (อุดมคติ)?","200 N","100 N","300 N","1,200 N","ระยะแรง = 2−0.5 = 1.5 ม. แรง×1.5 = 600×0.5 จึงได้ 200 N","ป"],
+["งัดก้อนหินด้วยคาน ให้ออกแรงน้อยลงควรทำอย่างไร?","เลื่อนจุดหมุนเข้าใกล้ก้อนหิน","เลื่อนจุดหมุนให้ไกลก้อนหิน","ใช้คานที่สั้นลง","จับคานใกล้จุดหมุน","ระยะน้ำหนักสั้นลง ระยะแรงยาวขึ้น จึงใช้แรงน้อยลง","ว"],
+["รอกเดี่ยวตายตัวมีประโยชน์ข้อใด?","เปลี่ยนทิศทางของแรง แต่ไม่ผ่อนแรง","ผ่อนแรง 2 เท่า","ผ่อนแรง 4 เท่า","ไม่ต้องออกแรงเลย","ดึงลงเพื่อยกขึ้นได้ แต่แรงที่ใช้ยังเท่ากับน้ำหนัก","ว"],
+["รอกเดี่ยวเคลื่อนที่ยกของ 100 N (อุดมคติ) ใช้แรงประมาณเท่าใด?","50 N","100 N","25 N","200 N","มีเชือก 2 เส้นช่วยรับน้ำหนัก แรง = 100÷2 = 50 N","ป"],
+["รอกที่ปลายเสาธงใช้ดึงธงขึ้น เป็นรอกแบบใด?","รอกเดี่ยวตายตัว","รอกเดี่ยวเคลื่อนที่","รอกพวง","สกรู","รอกยึดอยู่กับที่ ใช้เปลี่ยนทิศทางแรง","จ"],
+["ระบบรอกมีเชือก 4 เส้นรับน้ำหนัก ยกของ 400 N (อุดมคติ) ใช้แรงเท่าใด?","100 N","400 N","200 N","1,600 N","แรง = น้ำหนัก÷จำนวนเส้นเชือก = 400÷4 = 100 N","ป"],
+["รอกเคลื่อนที่ผ่อนแรงลงครึ่งหนึ่ง ถ้ายกของสูง 1 ม. ต้องดึงเชือกกี่เมตร?","2 ม.","0.5 ม.","1 ม.","4 ม.","ผ่อนแรงต้องแลกกับระยะทางที่ไกลขึ้น งาน (แรง×ระยะ) ยังเท่าเดิม","ว"],
+["ทางลาดช่วยผ่อนแรงอย่างไร?","ใช้แรงน้อยลงแต่ระยะทางยาวขึ้น","ทำให้วัตถุเบาลง","ทำให้งานลดลงมาก","เพิ่มความเร็วโดยไม่ต้องใช้แรง","พื้นเอียงยิ่งยาว/ลาดชันน้อย ยิ่งใช้แรงน้อย แต่ต้องเคลื่อนที่ไกลขึ้น","ว"],
+["ยกกล่องสูง 1 ม. ด้วยทางลาดยาว 4 ม. (ไร้แรงเสียดทาน) ใช้แรงเท่าใด?","1 ใน 4 ของน้ำหนัก","1 ใน 2 ของน้ำหนัก","เท่ากับน้ำหนัก","4 เท่าของน้ำหนัก","แรง = น้ำหนัก×สูง÷ยาว = น้ำหนัก×1/4","ป"],
+["ข้อใดไม่ใช่พื้นเอียง?","รอกยกของ","ทางลาดขึ้นอาคาร","สไลเดอร์","ถนนขึ้นเขา","ทางลาด สไลเดอร์ ถนนขึ้นเขา คือพื้นเอียง ส่วนรอกคือเครื่องกลอีกชนิด","จ"],
+["ถนนขึ้นภูเขาทำเป็นทางคดเคี้ยวเพราะเหตุใด?","ลดความชัน รถใช้แรงน้อยลงแม้ระยะทางไกลขึ้น","ให้วิวสวย","ลดงานที่ต้องทำเป็นศูนย์","ให้ถึงยอดเร็วกว่า","ทางคดเคี้ยวยาวขึ้น ความชันลดลง จึงผ่อนแรง","ว"],
+["ยกของหนักเท่ากันขึ้นสูง 0.5 ม. ด้วยทางลาด A ยาว 2 ม. และ B ยาว 4 ม. ทางใดใช้แรงน้อยกว่า?","ทางลาด B","ทางลาด A","เท่ากัน","บอกไม่ได้","สูงเท่ากัน ทางยาวกว่าลาดน้อยกว่า ใช้แรงน้อยกว่า","ว"],
+["ลูกบิดประตูหมุนง่ายกว่าหมุนแกนตรง ๆ เพราะเหตุใด?","ล้อมีรัศมีใหญ่กว่าเพลา","เพลามีรัศมีใหญ่กว่าล้อ","ลูกบิดมีน้ำหนักมาก","ลูกบิดเป็นลิ่ม","ออกแรงที่รัศมีใหญ่ ผ่อนแรงได้ตามอัตราส่วนรัศมีล้อต่อเพลา","ว"],
+["พวงมาลัยรัศมี 20 ซม. ติดเพลารัศมี 4 ซม. ผ่อนแรงกี่เท่า (อุดมคติ)?","5 เท่า","4 เท่า","16 เท่า","80 เท่า","20÷4 = 5 เท่า","ป"],
+["ข้อใดไม่ใช่ล้อและเพลา?","ขวานผ่าไม้","ลูกบิดประตู","พวงมาลัยรถ","กว้านตักน้ำ","ขวานเป็นลิ่ม ส่วนที่เหลือมีล้อ/ด้ามหมุนรอบเพลา","จ"],
+["ไขควงด้ามใหญ่หมุนสกรูได้ง่ายกว่าด้ามเล็ก เพราะเหตุใด?","รัศมีด้ามใหญ่ขึ้น จึงผ่อนแรงมากขึ้น","ด้ามใหญ่เบากว่า","ปลายไขควงคมกว่า","สกรูเบาลง","ด้ามเป็นล้อ ปลายเป็นเพลา ด้ามใหญ่ = อัตราส่วนรัศมีมาก","ว"],
+["เฟืองเล็กขับเฟืองใหญ่ ผลที่ได้คือ?","หมุนช้าลงแต่แรงบิดมากขึ้น","หมุนเร็วขึ้นและแรงมากขึ้น","หมุนเร็วเท่าเดิม","หมุนเร็วขึ้นแต่แรงลดลง","เฟืองใหญ่หมุนช้ากว่า แต่ได้แรงบิดเพิ่ม (แลกความเร็วกับแรง)","ว"],
+["ลิ่มช่วยงานอย่างไร?","เปลี่ยนแรงกดเป็นแรงดันด้านข้างเพื่อแยกวัตถุ","ยกวัตถุด้วยเชือก","หมุนเพื่อดึงวัตถุ","ใช้จุดหมุนงัดวัตถุ","ลิ่มถูกดันลงไป แรงจึงแผ่ออกด้านข้างจนวัตถุแยกออก","ว"],
+["ลิ่มเรียวยาว (ปลายแหลมมาก) เทียบกับลิ่มทื่อสั้น?","ผ่อนแรงได้มากกว่า","ผ่อนแรงน้อยกว่า","เท่ากัน","ไม่ผ่อนแรงเลย","ลิ่มยาวและเรียว เหมือนพื้นเอียงที่ลาดน้อย จึงผ่อนแรงมาก","ว"],
+["สิ่งใดทำงานเป็นลิ่ม?","มีดปอกผลไม้","ล้อรถเข็น","ก๊อกน้ำ","รอกเสาธง","ใบมีดมีด้านบางตัดแยกเนื้อผลไม้ จึงเป็นลิ่ม","จ"],
+["สกรูคือเครื่องกลอย่างง่ายแบบใดในโครงสร้าง?","พื้นเอียงที่พันรอบแกนทรงกระบอก","คานที่มีสองจุดหมุน","รอกหลายตัว","ลิ่มสองอัน","เกลียวสกรูคือพื้นเอียงที่พันเป็นเกลียวรอบแกน","จ"],
+["สกรูเกลียวถี่เทียบกับเกลียวห่าง (ขนาดเท่ากัน) ข้อใดถูก?","ผ่อนแรงมากกว่า แต่ต้องหมุนหลายรอบกว่า","ผ่อนแรงน้อยกว่า หมุนน้อยรอบกว่า","ผ่อนแรงมากกว่า หมุนน้อยรอบกว่า","ไม่ต่างกัน","เกลียวถี่ = พื้นเอียงลาดน้อย ผ่อนแรงมาก แต่ระยะทางรวม (จำนวนรอบ) มากขึ้น","ว"],
+["จับคู่ใดถูกต้อง?","กว้านตักน้ำ – ล้อและเพลา","ขวาน – รอก","ก๊อกน้ำ – ลิ่ม","ทางลาด – คาน","กว้านมีด้ามหมุนรอบเพลา = ล้อและเพลา","จ"],
+["เครื่องกลอย่างง่ายช่วย 'ลดงาน' ที่ต้องทำได้หรือไม่?","ไม่ได้ ผ่อนแรงได้แต่งานเท่าเดิม (จริงมักมากกว่าเพราะแรงเสียดทาน)","ได้เสมอ ถ้าใช้รอก","ได้ ถ้าใช้คานยาว","ไม่ได้ และผ่อนแรงก็ไม่ได้","งาน = แรง×ระยะ ผ่อนแรงแล้วต้องเพิ่มระยะ งานโดยรวมไม่ลดลง","ว"],
+["ทีมช่างต้องยกถังหนัก 300 N ขึ้นรถสูง 1 ม. ด้วยแรงไม่เกิน 100 N ทางลาดอุดมคติที่สั้นที่สุดที่ทำได้ยาวกี่เมตร?","3 ม.","1 ม.","2 ม.","6 ม.","300×1 = 100×ความยาว จึงได้ 3 ม.","ป"],
+["ที่เปิดกระป๋องแบบหมุนใช้เครื่องกลใดร่วมกัน?","ล้อและเพลา (ด้ามหมุน) กับลิ่ม (ใบมีด)","รอกกับคาน","สกรูกับรอก","พื้นเอียงอย่างเดียว","ด้ามหมุนคือล้อและเพลา ส่วนใบมีดตัดฝากระป๋องเป็นลิ่ม","จ"],
+["ระบบรอกมีเชือกรับน้ำหนัก 5 เส้น ยกกล่อง 500 N สูง 2 ม. (อุดมคติ) ต้องออกแรงและดึงเชือกเท่าใด?","100 N และดึงเชือก 10 ม.","500 N และดึง 2 ม.","100 N และดึง 2 ม.","250 N และดึง 4 ม.","แรง 500÷5 = 100 N เชือกที่ดึง = 2×5 = 10 ม. (ผ่อนแรงแลกระยะ)","ป"]];
+const TN=["🦁 สิงโตเหล็ก","🐯 เสือคาน","🐘 ช้างรอก","🦅 อินทรีลิ่ม","🐬 โลมาเฟือง","🐼 แพนด้าสกรู","🦊 จิ้งจอกล้อ","🐙 หมึกพื้นเอียง"];
+const TC=["#e74c3c","#e67e22","#8e44ad","#2980b9","#16a085","#2c3e50","#c0392b","#d35400"];
+const OC=["#e74c3c","#2e86de","#e0a800","#27ae60"],SH=["▲","◆","●","■"],DUR=45;
+function ord(qi){let s=(qi+13)*2654435761%4294967296||1,a=[0,1,2,3];for(let i=3;i>0;i--){s=(s*1664525+1013904223)%4294967296;const j=Math.floor(s/4294967296*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+// ===== ระบบข้อมูล (Firebase REST+SSE หรือโหมดทดลอง localStorage) =====
+const $=s=>document.querySelector(s),app=$('#app'),par=new URLSearchParams(location.search);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let FB=(par.get('f')||FB_URL||localStorage.msm_fb||'').replace(/\/$/,''),T={},CODE,ROLE,es,BC,last='',lq='',qS=0,busy=0,pid=sessionStorage.pid,me;
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2500)}
+function setAt(o,p,v){const k=p.split('/').filter(Boolean);if(!k.length)return v;let c=o;for(let i=0;i<k.length-1;i++){if(!c[k[i]]||typeof c[k[i]]!='object')c[k[i]]={};c=c[k[i]]}v===null?delete c[k[k.length-1]]:c[k[k.length-1]]=v;return o}
+function put(p,v){if(!FB)T=JSON.parse(localStorage['msm_'+CODE]||'{}');T=setAt(T,p,v)||{};
+ if(FB)fetch(`${FB}/rooms/${CODE}/${p}.json`,{method:'PUT',body:JSON.stringify(v)}).catch(()=>toast('ส่งข้อมูลไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต'));
+ else{localStorage['msm_'+CODE]=JSON.stringify(T);BC.postMessage(1)}draw()}
+function connect(code){CODE=code;T={};if(FB){es&&es.close();es=new EventSource(`${FB}/rooms/${code}.json`);
+ es.addEventListener('put',e=>{const d=JSON.parse(e.data);T=setAt(T,d.path,d.data)||{};draw()});
+ es.addEventListener('patch',e=>{const d=JSON.parse(e.data);for(const k in d.data)T=setAt(T,d.path+'/'+k,d.data[k])||{};draw()});
+ es.onerror=()=>toast('กำลังเชื่อมต่อใหม่...')}
+ else{BC=new BroadcastChannel('msm_'+code);const ld=()=>{T=JSON.parse(localStorage['msm_'+code]||'{}');draw()};BC.onmessage=ld;ld()}}
+const S=()=>T.s||{ph:'lobby',qi:0,d:DUR},P=()=>Object.entries(T.p||{}).map(([id,v])=>({id,...v}));
+const A=qi=>T.a?.['q'+qi]||{},R=(qi,t)=>T.r?.['q'+qi]?.['t'+t]||0;
+function board(){const ps=P();return TN.map((n,i)=>({i,n,m:ps.filter(p=>p.tm==i),pts:Object.keys(T.r||{}).reduce((s,k)=>s+(T.r[k]['t'+i]||0),0)})).filter(x=>x.m.length).sort((a,b)=>b.pts-a.pts)}
+function lbHTML(n){const b=board(),mx=Math.max(1,...b.map(x=>x.pts));return b.slice(0,n||8).map((x,r)=>`<div class=lb><b>${r+1}. ${x.n}</b><i style="background:${TC[x.i]};width:${Math.max(4,x.pts/mx*50)}%"></i><b>${x.pts}</b></div>`).join('')||'<p>ยังไม่มีคะแนน</p>'}
+// ===== ตรรกะเกม (ครู) =====
+function nextS(){const s=S();if(s.ph=='lobby')return put('s',{ph:'intro',qi:0,d:DUR});if(s.ph=='intro')return put('s',{ph:'q',qi:s.qi,d:DUR});const qi=s.qi+1;if(qi>=Q.length)return put('s',{ph:'end',qi:s.qi,d:DUR});put('s',{ph:qi%5?'q':'intro',qi,d:DUR})}
+function reveal(){const s=S();if(s.ph!='q')return;const qi=s.qi,a=A(qi),ps=P();let kc=0;
+ for(let t=0;t<8;t++){const m=ps.filter(p=>p.tm==t);if(!m.length)continue;let pts=0,ok=0;m.forEach(p=>{const x=a[p.id];if(x&&x.c==0){ok++;pts+=100+Math.max(0,Math.round(20*(1-x.t/(s.d*1000))))}});if(m.length>1&&ok==m.length)pts+=50;put(`r/q${qi}/t${t}`,pts);kc+=ok}
+ put(`k/q${qi}`,{c:kc,t:ps.filter(p=>a[p.id]).length});put('s',{ph:'rev',qi,d:s.d})}
+function resetRoom(){if(confirm('เริ่มเกมใหม่ในห้องเดิม? (ล้างคะแนนและคำตอบ แต่เก็บรายชื่อทีม)')){put('a',null);put('r',null);put('k',null);put('s',{ph:'lobby',qi:0,d:DUR})}}
+// ===== หน้าจอ =====
+function landing(){const r=par.get('r');if(r){app.innerHTML=`<div class=card><h1>🛠️ Mission Simple Machines</h1><p>เข้าร่วมห้อง <b>${esc(r)}</b></p><input id=nm placeholder="ชื่อเล่นของคุณ" maxlength=20 value="${esc(sessionStorage.nm||'')}"><button class="btn g" onclick="sJoin('${esc(r)}')">เข้าร่วม ▶</button></div>`;return}
+ if(sessionStorage.room){ROLE='S';connect(sessionStorage.room);return}
+ app.innerHTML=`<div class="card c"><h1>🛠️ Mission Simple Machines</h1><h2>ภารกิจช่างกลกู้เมือง</h2><p>เกมผจญภัยวิทยาศาสตร์ ม.2 เรื่องเครื่องกลอย่างง่าย</p>
+ <button class="btn b" onclick="tSetup()">👩‍🏫 ฉันคือครู</button><hr style="margin:14px 0"><p>นักเรียน: กรอกรหัสห้อง</p><input id=cd placeholder="รหัสห้อง" maxlength=6 style="text-transform:uppercase;text-align:center"><button class="btn g" onclick="location='?r='+$('#cd').value.toUpperCase()+(FB?'&f='+encodeURIComponent(FB):'')">ไปต่อ ▶</button></div>`}
+function tSetup(){app.innerHTML=`<div class=card><h2>ตั้งค่าห้อง (ครู)</h2><p>Firebase Realtime Database URL (ว่างไว้ = โหมดทดลอง ใช้ได้เฉพาะเบราว์เซอร์เครื่องเดียวกัน ไม่เชื่อมมือถือ)</p><input id=fb value="${esc(FB)}" placeholder="https://xxxx-default-rtdb.firebaseio.com">
+ <button class="btn g" onclick="mk()">สร้างห้องใหม่ ▶</button>${localStorage.msm_room?`<button class="btn b" onclick="ROLE='T';FB=\`${esc(FB)}\`;connect(localStorage.msm_room)">กลับเข้าห้องเดิม (${esc(localStorage.msm_room)})</button>`:''}</div>`}
+function mk(){FB=$('#fb').value.trim().replace(/\/$/,'');localStorage.msm_fb=FB;const c=Math.random().toString(36).slice(2,6).toUpperCase();localStorage.msm_room=c;ROLE='T';connect(c);put('s',{ph:'lobby',qi:0,d:DUR})}
+function sJoin(r){const n=$('#nm').value.trim();if(!n)return toast('กรอกชื่อก่อนนะ');sessionStorage.nm=n;sessionStorage.room=r;ROLE='S';connect(r)}
+function pick(t){const m=P().filter(p=>p.tm==t&&p.id!=pid).length;if(m>=4)return toast('ทีมนี้เต็มแล้ว');pid=sessionStorage.pid='p'+Math.random().toString(36).slice(2,8);put(`p/${pid}`,{n:sessionStorage.nm,tm:t})}
+function ans(c){const s=S();if(s.ph!='q')return;put(`a/q${s.qi}/${pid}`,{c,t:Date.now()-qS})}
+function optsHTML(qi,mode){const q=Q[qi],o=ord(qi),mine=A(qi)[pid]?.c,cn=[0,0,0,0];Object.values(A(qi)).forEach(x=>cn[x.c]++);
+ return o.map((k,p)=>`<button class="opt ${mode=='rev'?(k==0?'ok':'no'):mine==k?'sel':''}" style="background:${OC[p]}" ${mode=='S'?`onclick="ans(${k})"`:''}>${SH[p]} ${q[1+k]}${mode=='rev'?` <span class=tag>${cn[k]} คน</span>`:''}${mode=='S'&&mine==k?' ✔':''}</button>`).join('')}
+function qHead(s){const l=LV[Math.floor(s.qi/5)];return `<div class=row><span><span class=tag>${l[0]} ด่าน ${Math.floor(s.qi/5)+1}: ${l[1]}</span><span class=tag>ข้อ ${s.qi+1}/${Q.length}</span><span class=tag>${TY[Q[s.qi][6]]}</span></span>${s.ph=='q'?`<b class=big style="font-size:44px" id=tm>${s.d}</b>`:''}</div>${s.ph=='q'?'<div class=bar><i id=bar style="width:100%"></i></div>':''}`}
+function render(){const s=S();
+ if(ROLE=='T'){
+  if(s.ph=='lobby'){const url=location.href.split('?')[0]+'?r='+CODE+(FB?'&f='+encodeURIComponent(FB):''),b=TN.map((n,i)=>`<div class=team style="background:${TC[i]}">${n}<br>${P().filter(p=>p.tm==i).map(p=>esc(p.n)).join(', ')||'<small>รอสมาชิก...</small>'}</div>`).join('');
+   app.innerHTML=`<div class=card><div class=row><div><h1>🛠️ Mission Simple Machines</h1><p>สแกน QR หรือเปิด <b>${esc(location.href.split('?')[0])}</b> แล้วกรอกรหัส</p><div class=big>${CODE}</div>${FB?'':'<p style="color:#c00">⚠️ โหมดทดลอง: ใช้ได้เฉพาะแท็บในเครื่องนี้ (ยังไม่ได้ตั้งค่า Firebase)</p>'}</div><div id=qr></div></div></div>
+   <div class=card><h2>👥 ทีมที่เข้าร่วม (${P().length}/32 คน)</h2><div class=grid>${b}</div><div class=c><button class="btn g" onclick="nextS()" ${P().length?'':'disabled'}>เริ่มภารกิจ ▶</button></div></div>`;
+   if(window.QRCode)new QRCode($('#qr'),{text:url,width:200,height:200});else $('#qr').innerHTML=`<small>${esc(url)}</small>`}
+  else if(s.ph=='intro'){const l=LV[s.qi/5];app.innerHTML=`<div class="card c"><div class=big>${l[0]}</div><h1>ด่านที่ ${s.qi/5+1}: ${l[1]}</h1><h2>ทักษะ: ${l[2]}</h2><p>ปรึกษากันในทีมก่อนตอบ ตอบถูกทั้งทีมได้โบนัส!</p><button class="btn g" onclick="nextS()">เริ่มด่าน ▶</button></div><div class=card>${lbHTML(5)}</div>`}
+  else if(s.ph=='q')app.innerHTML=`<div class=card>${qHead(s)}<h2 style="margin:14px 0">${Q[s.qi][0]}</h2>${optsHTML(s.qi,'T0')}<div class=row><span class=tag style="font-size:22px">ตอบแล้ว <span id=cnt>0/${P().length}</span></span><button class="btn" onclick="reveal()">เฉลยเลย</button></div></div>`;
+  else if(s.ph=='rev'){const q=Q[s.qi],b=board();app.innerHTML=`<div class=card>${qHead(s)}<h2 style="margin:14px 0">${q[0]}</h2>${optsHTML(s.qi,'rev')}<div style="background:#fff7cc;border:3px solid #1f2d4d;border-radius:14px;padding:12px;margin:8px 0"><p>💡 <b>เฉลย:</b> ${q[5]}</p></div>
+   <div>${b.map(x=>`<span class=tag style="background:${TC[x.i]}">${x.n} +${R(s.qi,x.i)}</span>`).join('')}</div><div class=row><div style="flex:1;min-width:260px">${lbHTML(5)}</div><button class="btn g" onclick="nextS()">${s.qi+1>=Q.length?'ดูผลสรุป 🏆':'ต่อไป ▶'}</button></div></div>`}
+  else end(true)}
+ else{
+  if(!T.s)return app.innerHTML=`<div class="card c"><h2>⏳ กำลังเชื่อมต่อห้อง ${esc(sessionStorage.room||'')}...</h2><p>ถ้านานเกินไป ตรวจสอบรหัสห้องและอินเทอร์เน็ต</p><button class=btn onclick="sessionStorage.clear();location='.'">ออก</button></div>`;
+  if(!me)return app.innerHTML=`<div class=card><h2>เลือกทีมของคุณ</h2><div class=grid>${TN.map((n,i)=>{const c=P().filter(p=>p.tm==i).length;return `<button class="opt" style="background:${TC[i]}" onclick="pick(${i})" ${c>=4?'disabled':''}>${n} <span class=tag>${c}/4</span></button>`}).join('')}</div></div>`;
+  const tm=me.tm,hd=`<div class=row style="color:#fff;background:${TC[tm]};border:3px solid #1f2d4d;border-radius:14px;padding:6px 12px"><b>${TN[tm]}</b><b>${esc(me.n)}</b></div>`;
+  if(s.ph=='lobby'||s.ph=='intro'){const l=LV[Math.floor(s.qi/5)];app.innerHTML=`<div class="card c">${hd}<h2 style="margin-top:14px">${s.ph=='lobby'?'🕐 รอครูเริ่มภารกิจ...':l[0]+' ด่าน '+(s.qi/5+1)+': '+l[1]}</h2><p>เตรียมปรึกษากันในทีมนะ!</p></div>`}
+  else if(s.ph=='q'){const m=A(s.qi)[pid]!==undefined;app.innerHTML=`<div class=card>${hd}${qHead(s)}<h2 style="font-size:22px;margin:10px 0">${Q[s.qi][0]}</h2>${optsHTML(s.qi,'S')}<p class=c>${m?'✅ ส่งคำตอบแล้ว (เปลี่ยนได้ก่อนหมดเวลา) — ปรึกษาทีมต่อได้!':'💬 ปรึกษาทีมก่อน แล้วกดตอบ'}</p></div>`}
+  else if(s.ph=='rev'){const q=Q[s.qi],x=A(s.qi)[pid],ok=x&&x.c==0;app.innerHTML=`<div class=card>${hd}<div class=c><div class=big>${!x?'⏰':ok?'✅':'❌'}</div><h2>${!x?'ยังไม่ได้ตอบ':ok?'ถูกต้อง!':'ยังไม่ถูก ไม่เป็นไร!'}</h2></div><p style="margin:10px 0">คำตอบที่ถูก: <b>${q[1]}</b></p><div style="background:#fff7cc;border:3px solid #1f2d4d;border-radius:14px;padding:12px"><p>💡 ${q[5]}</p></div><p class=c style="margin-top:10px"><span class=tag>ทีมได้ +${R(s.qi,tm)} คะแนน</span><span class=tag>อันดับ ${board().findIndex(b=>b.i==tm)+1}</span></p></div>`}
+  else end(false)}}
+function end(t){const b=board(),lv=LV.map((l,i)=>{let c=0,n=0;for(let q=i*5;q<i*5+5;q++){const k=T.k?.['q'+q];if(k){c+=k.c;n+=k.t}}return `<div class=lb><b>${l[0]} ${l[2]}</b><i style="background:${n&&c/n<.6?'#ff7043':'#43c463'};width:${n?c/n*50:0}%"></i><b>${n?Math.round(c/n*100):0}%</b></div>`}).join('');
+ const mine=!t&&me?`<h2>ทีมของคุณอันดับ ${b.findIndex(x=>x.i==me.tm)+1} 🎉</h2>`:'';
+ app.innerHTML=`<div class="card c"><div class=big>🏆</div><h1>ภารกิจสำเร็จ! เมืองกลับมาใช้งานได้แล้ว</h1>${mine}</div><div class=card><h2>อันดับทีม</h2>${lbHTML(8)}</div>${t?`<div class=card><h2>📊 ความเข้าใจรายด่าน (ตอบถูกทั้งห้อง) — แท่งสีส้ม = ควรทบทวน</h2>${lv}<div class=c><button class=btn onclick="resetRoom()">เล่นใหม่</button></div></div>`:''}`}
+function draw(){if(!ROLE||!CODE)return;const s=S(),pl=P().map(p=>p.id+p.tm+p.n).join();me=T.p?.[pid];
+ if(s.ph=='q'&&lq!=CODE+s.qi){lq=CODE+s.qi;qS=Date.now()}
+ const sig=ROLE+(me?'m':'n')+(T.s?1:0)+s.ph+s.qi+(s.ph=='lobby'||!me?pl:'')+(ROLE=='S'&&s.ph=='q'?A(s.qi)[pid]?.c:'')+(s.ph=='rev'||s.ph=='end'?JSON.stringify([T.r,T.k]):'');
+ if(sig!=last){last=sig;render()}}
+setInterval(()=>{const s=S();if(!ROLE||s.ph!='q')return;const left=Math.max(0,s.d-Math.floor((Date.now()-qS)/1000)),t=$('#tm'),b=$('#bar');if(t)t.textContent=left;if(b)b.style.width=left/s.d*100+'%';
+ if(ROLE=='T'){const n=Object.keys(A(s.qi)).length,c=$('#cnt');if(c)c.textContent=n+'/'+P().length;if((left<=0||(n&&n>=P().length))&&!busy){busy=1;reveal();setTimeout(()=>busy=0,1500)}}},250);
+landing();
+</script></body></html>
