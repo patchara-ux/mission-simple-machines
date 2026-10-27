@@ -16,10 +16,9 @@ input{font:600 22px Prompt,sans-serif;padding:12px;border:4px solid #1f2d4d;bord
 .lb{display:flex;align-items:center;gap:8px;margin:6px 0}.lb b{min-width:200px}.lb i{display:block;height:26px;border-radius:8px;border:3px solid #1f2d4d}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1f2d4d;color:#fff;padding:10px 20px;border-radius:20px;display:none;z-index:9}
 </style></head><body><div id="app"></div><div id="toast"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-// ===== ตั้งค่า: ใส่ Firebase Realtime Database URL ที่นี่ (ดูคู่มือ) เช่น "https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app"
-const FB_URL="https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app";
+// ===== ตั้งค่า: ใส่ Firebase Realtime Database URL ที่นี่ เช่น "https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app"
+const FB_URL="";
 // ===== ข้อมูลด่านและโจทย์ [โจทย์, คำตอบที่ถูก, ตัวลวง1, ตัวลวง2, ตัวลวง3, เฉลย, ประเภท(จ=จำแนก ว=วิเคราะห์ ป=แก้ปัญหา)]
 const LV=[["🌉","สะพานคาน","คาน"],["🏗️","หอรอก","รอก"],["⛰️","เนินพื้นเอียง","พื้นเอียง"],["⚙️","โรงสีล้อและเพลา","ล้อและเพลา"],["⛏️","เหมืองลิ่มและสกรู","ลิ่มและสกรู"],["🐉","ด่านบอสรวมช่าง","ผสมผสาน"]];
 const TY={จ:"จำแนก",ว:"วิเคราะห์",ป:"แก้ปัญหา"};
@@ -58,71 +57,53 @@ const TN=["🦁 สิงโตเหล็ก","🐯 เสือคาน","�
 const TC=["#e74c3c","#e67e22","#8e44ad","#2980b9","#16a085","#2c3e50","#c0392b","#d35400"];
 const OC=["#e74c3c","#2e86de","#e0a800","#27ae60"],SH=["▲","◆","●","■"],DUR=45;
 function ord(qi){let s=(qi+13)*2654435761%4294967296||1,a=[0,1,2,3];for(let i=3;i>0;i--){s=(s*1664525+1013904223)%4294967296;const j=Math.floor(s/4294967296*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-// ===== ระบบข้อมูล (Firebase REST+SSE หรือโหมดทดลอง localStorage) =====
+// ===== ระบบเก็บคะแนน: Firebase (REST ธรรมดา ไม่ใช่เรียลไทม์) หรือเก็บในเครื่องถ้าไม่ได้ตั้งค่า =====
 const $=s=>document.querySelector(s),app=$('#app'),par=new URLSearchParams(location.search);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let FB=(par.get('f')||FB_URL||localStorage.msm_fb||'').replace(/\/$/,''),T={},CODE,ROLE,es,BC,last='',lq='',qS=0,busy=0,pid=sessionStorage.pid,me;
+const FB=(par.get('f')||FB_URL).replace(/\/$/,''),cl=s=>(s||'main').trim().replace(/[.#$\[\]\/\s]/g,'_').slice(0,20)||'main';
+let CLS=cl(par.get('c')),me=JSON.parse(localStorage.msm_me||'{}'),TM=me.tm,G,iv,bv;
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2500)}
-function setAt(o,p,v){const k=p.split('/').filter(Boolean);if(!k.length)return v;let c=o;for(let i=0;i<k.length-1;i++){if(!c[k[i]]||typeof c[k[i]]!='object')c[k[i]]={};c=c[k[i]]}v===null?delete c[k[k.length-1]]:c[k[k.length-1]]=v;return o}
-function put(p,v){if(!FB)T=JSON.parse(localStorage['msm_'+CODE]||'{}');T=setAt(T,p,v)||{};
- if(FB)fetch(`${FB}/rooms/${CODE}/${p}.json`,{method:'PUT',body:JSON.stringify(v)}).catch(()=>toast('ส่งข้อมูลไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต'));
- else{localStorage['msm_'+CODE]=JSON.stringify(T);BC.postMessage(1)}draw()}
-function connect(code){CODE=code;T={};if(FB){es&&es.close();es=new EventSource(`${FB}/rooms/${code}.json`);
- es.addEventListener('put',e=>{const d=JSON.parse(e.data);T=setAt(T,d.path,d.data)||{};draw()});
- es.addEventListener('patch',e=>{const d=JSON.parse(e.data);for(const k in d.data)T=setAt(T,d.path+'/'+k,d.data[k])||{};draw()});
- es.onerror=()=>toast('กำลังเชื่อมต่อใหม่...')}
- else{BC=new BroadcastChannel('msm_'+code);const ld=()=>{T=JSON.parse(localStorage['msm_'+code]||'{}');draw()};BC.onmessage=ld;ld()}}
-const S=()=>T.s||{ph:'lobby',qi:0,d:DUR},P=()=>Object.entries(T.p||{}).map(([id,v])=>({id,...v}));
-const A=qi=>T.a?.['q'+qi]||{},R=(qi,t)=>T.r?.['q'+qi]?.['t'+t]||0;
-function board(){const ps=P();return TN.map((n,i)=>({i,n,m:ps.filter(p=>p.tm==i),pts:Object.keys(T.r||{}).reduce((s,k)=>s+(T.r[k]['t'+i]||0),0)})).filter(x=>x.m.length).sort((a,b)=>b.pts-a.pts)}
-function lbHTML(n){const b=board(),mx=Math.max(1,...b.map(x=>x.pts));return b.slice(0,n||8).map((x,r)=>`<div class=lb><b>${r+1}. ${x.n}</b><i style="background:${TC[x.i]};width:${Math.max(4,x.pts/mx*50)}%"></i><b>${x.pts}</b></div>`).join('')||'<p>ยังไม่มีคะแนน</p>'}
-// ===== ตรรกะเกม (ครู) =====
-function nextS(){const s=S();if(s.ph=='lobby')return put('s',{ph:'intro',qi:0,d:DUR});if(s.ph=='intro')return put('s',{ph:'q',qi:s.qi,d:DUR});const qi=s.qi+1;if(qi>=Q.length)return put('s',{ph:'end',qi:s.qi,d:DUR});put('s',{ph:qi%5?'q':'intro',qi,d:DUR})}
-function reveal(){const s=S();if(s.ph!='q')return;const qi=s.qi,a=A(qi),ps=P();let kc=0;
- for(let t=0;t<8;t++){const m=ps.filter(p=>p.tm==t);if(!m.length)continue;let pts=0,ok=0;m.forEach(p=>{const x=a[p.id];if(x&&x.c==0){ok++;pts+=100+Math.max(0,Math.round(20*(1-x.t/(s.d*1000))))}});if(m.length>1&&ok==m.length)pts+=50;put(`r/q${qi}/t${t}`,pts);kc+=ok}
- put(`k/q${qi}`,{c:kc,t:ps.filter(p=>a[p.id]).length});put('s',{ph:'rev',qi,d:s.d})}
-function resetRoom(){if(confirm('เริ่มเกมใหม่ในห้องเดิม? (ล้างคะแนนและคำตอบ แต่เก็บรายชื่อทีม)')){put('a',null);put('r',null);put('k',null);put('s',{ph:'lobby',qi:0,d:DUR})}}
-// ===== หน้าจอ =====
-function landing(){const r=par.get('r');if(r){app.innerHTML=`<div class=card><h1>🛠️ Mission Simple Machines</h1><p>เข้าร่วมห้อง <b>${esc(r)}</b></p><input id=nm placeholder="ชื่อเล่นของคุณ" maxlength=20 value="${esc(sessionStorage.nm||'')}"><button class="btn g" onclick="sJoin('${esc(r)}')">เข้าร่วม ▶</button></div>`;return}
- if(sessionStorage.room){ROLE='S';connect(sessionStorage.room);return}
- app.innerHTML=`<div class="card c"><h1>🛠️ Mission Simple Machines</h1><h2>ภารกิจช่างกลกู้เมือง</h2><p>เกมผจญภัยวิทยาศาสตร์ ม.2 เรื่องเครื่องกลอย่างง่าย</p>
- <button class="btn b" onclick="tSetup()">👩‍🏫 ฉันคือครู</button><hr style="margin:14px 0"><p>นักเรียน: กรอกรหัสห้อง</p><input id=cd placeholder="รหัสห้อง" maxlength=6 style="text-transform:uppercase;text-align:center"><button class="btn g" onclick="location='?r='+$('#cd').value.toUpperCase()+(FB?'&f='+encodeURIComponent(FB):'')">ไปต่อ ▶</button></div>`}
-function tSetup(){app.innerHTML=`<div class=card><h2>ตั้งค่าห้อง (ครู)</h2><p>Firebase Realtime Database URL (ว่างไว้ = โหมดทดลอง ใช้ได้เฉพาะเบราว์เซอร์เครื่องเดียวกัน ไม่เชื่อมมือถือ)</p><input id=fb value="${esc(FB)}" placeholder="https://xxxx-default-rtdb.firebaseio.com">
- <button class="btn g" onclick="mk()">สร้างห้องใหม่ ▶</button>${localStorage.msm_room?`<button class="btn b" onclick="ROLE='T';FB=\`${esc(FB)}\`;connect(localStorage.msm_room)">กลับเข้าห้องเดิม (${esc(localStorage.msm_room)})</button>`:''}</div>`}
-function mk(){FB=$('#fb').value.trim().replace(/\/$/,'');localStorage.msm_fb=FB;const c=Math.random().toString(36).slice(2,6).toUpperCase();localStorage.msm_room=c;ROLE='T';connect(c);put('s',{ph:'lobby',qi:0,d:DUR})}
-function sJoin(r){const n=$('#nm').value.trim();if(!n)return toast('กรอกชื่อก่อนนะ');sessionStorage.nm=n;sessionStorage.room=r;ROLE='S';connect(r)}
-function pick(t){const m=P().filter(p=>p.tm==t&&p.id!=pid).length;if(m>=4)return toast('ทีมนี้เต็มแล้ว');pid=sessionStorage.pid='p'+Math.random().toString(36).slice(2,8);put(`p/${pid}`,{n:sessionStorage.nm,tm:t})}
-function ans(c){const s=S();if(s.ph!='q')return;put(`a/q${s.qi}/${pid}`,{c,t:Date.now()-qS})}
-function optsHTML(qi,mode){const q=Q[qi],o=ord(qi),mine=A(qi)[pid]?.c,cn=[0,0,0,0];Object.values(A(qi)).forEach(x=>cn[x.c]++);
- return o.map((k,p)=>`<button class="opt ${mode=='rev'?(k==0?'ok':'no'):mine==k?'sel':''}" style="background:${OC[p]}" ${mode=='S'?`onclick="ans(${k})"`:''}>${SH[p]} ${q[1+k]}${mode=='rev'?` <span class=tag>${cn[k]} คน</span>`:''}${mode=='S'&&mine==k?' ✔':''}</button>`).join('')}
-function qHead(s){const l=LV[Math.floor(s.qi/5)];return `<div class=row><span><span class=tag>${l[0]} ด่าน ${Math.floor(s.qi/5)+1}: ${l[1]}</span><span class=tag>ข้อ ${s.qi+1}/${Q.length}</span><span class=tag>${TY[Q[s.qi][6]]}</span></span>${s.ph=='q'?`<b class=big style="font-size:44px" id=tm>${s.d}</b>`:''}</div>${s.ph=='q'?'<div class=bar><i id=bar style="width:100%"></i></div>':''}`}
-function render(){const s=S();
- if(ROLE=='T'){
-  if(s.ph=='lobby'){const url=location.href.split('?')[0]+'?r='+CODE+(FB?'&f='+encodeURIComponent(FB):''),b=TN.map((n,i)=>`<div class=team style="background:${TC[i]}">${n}<br>${P().filter(p=>p.tm==i).map(p=>esc(p.n)).join(', ')||'<small>รอสมาชิก...</small>'}</div>`).join('');
-   app.innerHTML=`<div class=card><div class=row><div><h1>🛠️ Mission Simple Machines</h1><p>สแกน QR หรือเปิด <b>${esc(location.href.split('?')[0])}</b> แล้วกรอกรหัส</p><div class=big>${CODE}</div>${FB?'':'<p style="color:#c00">⚠️ โหมดทดลอง: ใช้ได้เฉพาะแท็บในเครื่องนี้ (ยังไม่ได้ตั้งค่า Firebase)</p>'}</div><div id=qr></div></div></div>
-   <div class=card><h2>👥 ทีมที่เข้าร่วม (${P().length}/32 คน)</h2><div class=grid>${b}</div><div class=c><button class="btn g" onclick="nextS()" ${P().length?'':'disabled'}>เริ่มภารกิจ ▶</button></div></div>`;
-   if(window.QRCode)new QRCode($('#qr'),{text:url,width:200,height:200});else $('#qr').innerHTML=`<small>${esc(url)}</small>`}
-  else if(s.ph=='intro'){const l=LV[s.qi/5];app.innerHTML=`<div class="card c"><div class=big>${l[0]}</div><h1>ด่านที่ ${s.qi/5+1}: ${l[1]}</h1><h2>ทักษะ: ${l[2]}</h2><p>ปรึกษากันในทีมก่อนตอบ ตอบถูกทั้งทีมได้โบนัส!</p><button class="btn g" onclick="nextS()">เริ่มด่าน ▶</button></div><div class=card>${lbHTML(5)}</div>`}
-  else if(s.ph=='q')app.innerHTML=`<div class=card>${qHead(s)}<h2 style="margin:14px 0">${Q[s.qi][0]}</h2>${optsHTML(s.qi,'T0')}<div class=row><span class=tag style="font-size:22px">ตอบแล้ว <span id=cnt>0/${P().length}</span></span><button class="btn" onclick="reveal()">เฉลยเลย</button></div></div>`;
-  else if(s.ph=='rev'){const q=Q[s.qi],b=board();app.innerHTML=`<div class=card>${qHead(s)}<h2 style="margin:14px 0">${q[0]}</h2>${optsHTML(s.qi,'rev')}<div style="background:#fff7cc;border:3px solid #1f2d4d;border-radius:14px;padding:12px;margin:8px 0"><p>💡 <b>เฉลย:</b> ${q[5]}</p></div>
-   <div>${b.map(x=>`<span class=tag style="background:${TC[x.i]}">${x.n} +${R(s.qi,x.i)}</span>`).join('')}</div><div class=row><div style="flex:1;min-width:260px">${lbHTML(5)}</div><button class="btn g" onclick="nextS()">${s.qi+1>=Q.length?'ดูผลสรุป 🏆':'ต่อไป ▶'}</button></div></div>`}
-  else end(true)}
- else{
-  if(!T.s)return app.innerHTML=`<div class="card c"><h2>⏳ กำลังเชื่อมต่อห้อง ${esc(sessionStorage.room||'')}...</h2><p>ถ้านานเกินไป ตรวจสอบรหัสห้องและอินเทอร์เน็ต</p><button class=btn onclick="sessionStorage.clear();location='.'">ออก</button></div>`;
-  if(!me)return app.innerHTML=`<div class=card><h2>เลือกทีมของคุณ</h2><div class=grid>${TN.map((n,i)=>{const c=P().filter(p=>p.tm==i).length;return `<button class="opt" style="background:${TC[i]}" onclick="pick(${i})" ${c>=4?'disabled':''}>${n} <span class=tag>${c}/4</span></button>`}).join('')}</div></div>`;
-  const tm=me.tm,hd=`<div class=row style="color:#fff;background:${TC[tm]};border:3px solid #1f2d4d;border-radius:14px;padding:6px 12px"><b>${TN[tm]}</b><b>${esc(me.n)}</b></div>`;
-  if(s.ph=='lobby'||s.ph=='intro'){const l=LV[Math.floor(s.qi/5)];app.innerHTML=`<div class="card c">${hd}<h2 style="margin-top:14px">${s.ph=='lobby'?'🕐 รอครูเริ่มภารกิจ...':l[0]+' ด่าน '+(s.qi/5+1)+': '+l[1]}</h2><p>เตรียมปรึกษากันในทีมนะ!</p></div>`}
-  else if(s.ph=='q'){const m=A(s.qi)[pid]!==undefined;app.innerHTML=`<div class=card>${hd}${qHead(s)}<h2 style="font-size:22px;margin:10px 0">${Q[s.qi][0]}</h2>${optsHTML(s.qi,'S')}<p class=c>${m?'✅ ส่งคำตอบแล้ว (เปลี่ยนได้ก่อนหมดเวลา) — ปรึกษาทีมต่อได้!':'💬 ปรึกษาทีมก่อน แล้วกดตอบ'}</p></div>`}
-  else if(s.ph=='rev'){const q=Q[s.qi],x=A(s.qi)[pid],ok=x&&x.c==0;app.innerHTML=`<div class=card>${hd}<div class=c><div class=big>${!x?'⏰':ok?'✅':'❌'}</div><h2>${!x?'ยังไม่ได้ตอบ':ok?'ถูกต้อง!':'ยังไม่ถูก ไม่เป็นไร!'}</h2></div><p style="margin:10px 0">คำตอบที่ถูก: <b>${q[1]}</b></p><div style="background:#fff7cc;border:3px solid #1f2d4d;border-radius:14px;padding:12px"><p>💡 ${q[5]}</p></div><p class=c style="margin-top:10px"><span class=tag>ทีมได้ +${R(s.qi,tm)} คะแนน</span><span class=tag>อันดับ ${board().findIndex(b=>b.i==tm)+1}</span></p></div>`}
-  else end(false)}}
-function end(t){const b=board(),lv=LV.map((l,i)=>{let c=0,n=0;for(let q=i*5;q<i*5+5;q++){const k=T.k?.['q'+q];if(k){c+=k.c;n+=k.t}}return `<div class=lb><b>${l[0]} ${l[2]}</b><i style="background:${n&&c/n<.6?'#ff7043':'#43c463'};width:${n?c/n*50:0}%"></i><b>${n?Math.round(c/n*100):0}%</b></div>`}).join('');
- const mine=!t&&me?`<h2>ทีมของคุณอันดับ ${b.findIndex(x=>x.i==me.tm)+1} 🎉</h2>`:'';
- app.innerHTML=`<div class="card c"><div class=big>🏆</div><h1>ภารกิจสำเร็จ! เมืองกลับมาใช้งานได้แล้ว</h1>${mine}</div><div class=card><h2>อันดับทีม</h2>${lbHTML(8)}</div>${t?`<div class=card><h2>📊 ความเข้าใจรายด่าน (ตอบถูกทั้งห้อง) — แท่งสีส้ม = ควรทบทวน</h2>${lv}<div class=c><button class=btn onclick="resetRoom()">เล่นใหม่</button></div></div>`:''}`}
-function draw(){if(!ROLE||!CODE)return;const s=S(),pl=P().map(p=>p.id+p.tm+p.n).join();me=T.p?.[pid];
- if(s.ph=='q'&&lq!=CODE+s.qi){lq=CODE+s.qi;qS=Date.now()}
- const sig=ROLE+(me?'m':'n')+(T.s?1:0)+s.ph+s.qi+(s.ph=='lobby'||!me?pl:'')+(ROLE=='S'&&s.ph=='q'?A(s.qi)[pid]?.c:'')+(s.ph=='rev'||s.ph=='end'?JSON.stringify([T.r,T.k]):'');
- if(sig!=last){last=sig;render()}}
-setInterval(()=>{const s=S();if(!ROLE||s.ph!='q')return;const left=Math.max(0,s.d-Math.floor((Date.now()-qS)/1000)),t=$('#tm'),b=$('#bar');if(t)t.textContent=left;if(b)b.style.width=left/s.d*100+'%';
- if(ROLE=='T'){const n=Object.keys(A(s.qi)).length,c=$('#cnt');if(c)c.textContent=n+'/'+P().length;if((left<=0||(n&&n>=P().length))&&!busy){busy=1;reveal();setTimeout(()=>busy=0,1500)}}},250);
-landing();
+async function getLB(){if(FB){const r=await fetch(`${FB}/lb/${CLS}.json`);if(!r.ok)throw 0;return await r.json()||{}}return JSON.parse(localStorage['msm_lb_'+CLS]||'{}')}
+async function putRec(rec){if(FB){const r=await fetch(`${FB}/lb/${CLS}/${me.id}.json`,{method:'PUT',body:JSON.stringify(rec)});if(!r.ok)throw 0}else{const o=JSON.parse(localStorage['msm_lb_'+CLS]||'{}');o[me.id]=rec;localStorage['msm_lb_'+CLS]=JSON.stringify(o)}}
+// ===== หน้าเริ่มต้น =====
+function landing(){clearInterval(iv);clearInterval(bv);
+ app.innerHTML=`<div class="card c"><div class=big>🛠️</div><h1>Mission Simple Machines</h1><h2>ภารกิจช่างกลกู้เมือง</h2><p>ตอบ 30 คำถาม ผ่าน 6 ด่านเพื่อกู้เมือง เล่นคนเดียวบนมือถือ คะแนนของทุกคนรวมเป็นคะแนนทีม!</p>
+ <input id=nm placeholder="ชื่อเล่นของคุณ" maxlength=20 value="${esc(me.n||'')}"><input id=cc placeholder="รหัสห้อง (ถ้าครูให้)" maxlength=20 value="${par.get('c')?esc(CLS):''}">
+ <p style="margin-top:8px"><b>เลือกทีมของคุณ</b></p><div class=grid>${TN.map((n,i)=>`<button class="opt tm ${TM===i?'sel':''}" style="background:${TC[i]}" onclick="selT(${i})">${n}</button>`).join('')}</div>
+ <button class="btn g" onclick="start()">เริ่มภารกิจ ▶</button><button class="btn b" onclick="CLS=cl($('#cc').value||par.get('c'));board()">🏆 กระดานอันดับ</button>${FB?'':'<p style="color:#c00;font-size:15px">โหมดทดลอง: คะแนนเก็บในเครื่องนี้เท่านั้น (ยังไม่ได้ตั้งค่า Firebase)</p>'}</div>`}
+function selT(i){TM=i;document.querySelectorAll('.tm').forEach((b,j)=>b.classList.toggle('sel',j==i))}
+function start(){const n=$('#nm').value.trim();if(!n)return toast('กรอกชื่อก่อนนะ');if(TM==null)return toast('เลือกทีมก่อนนะ');CLS=cl($('#cc').value||par.get('c'));
+ me={...me,id:me.id||'p'+Math.random().toString(36).slice(2,9),n,tm:TM};localStorage.msm_me=JSON.stringify(me);G={qi:0,pts:0,ok:0,lv:[0,0,0,0,0,0],wrong:[],ph:'intro'};show()}
+// ===== เล่นเกม =====
+function go(){G.ph='q';G.t0=Date.now();show();iv=setInterval(tick,250)}
+function tick(){const left=Math.max(0,DUR-Math.floor((Date.now()-G.t0)/1000)),t=$('#tm'),b=$('#bar');if(t)t.textContent=left;if(b)b.style.width=left/DUR*100+'%';if(left<=0)pick(-1)}
+function pick(k){if(G.ph!='q')return;clearInterval(iv);const t=Date.now()-G.t0,ok=k==0,pts=ok?100+Math.max(0,Math.round(20*(1-t/(DUR*1000)))):0;
+ G.pts+=pts;if(ok){G.ok++;G.lv[Math.floor(G.qi/5)]++}else G.wrong.push(G.qi);G.last={k,ok,pts};G.ph='fb';show()}
+function next(){G.qi++;if(G.qi>=Q.length){G.ph='end';return show()}if(G.qi%5)go();else{G.ph='intro';show()}}
+function show(){clearInterval(iv);const q=Q[G.qi]||Q[0],L=Math.floor(G.qi/5),l=LV[Math.min(L,5)],o=ord(G.qi);
+ const hd=`<div class=row><span><span class=tag>${l[0]} ด่าน ${L+1}: ${l[1]}</span><span class=tag>ข้อ ${G.qi+1}/${Q.length}</span><span class=tag>⭐ ${G.pts}</span></span>${G.ph=='q'?'<b id=tm style="font-size:40px">'+DUR+'</b>':''}</div>${G.ph=='q'?'<div class=bar><i id=bar style="width:100%"></i></div>':''}`;
+ if(G.ph=='intro')app.innerHTML=`<div class="card c"><div class=big>${l[0]}</div><h1>ด่านที่ ${L+1}: ${l[1]}</h1><h2>ทักษะ: ${l[2]}</h2><p>อ่านโจทย์ให้ดี ตอบถูกได้คะแนน ความเร็วมีผลเพียงเล็กน้อย</p><button class="btn g" onclick="go()">เริ่มด่าน ▶</button></div>`;
+ else if(G.ph=='q')app.innerHTML=`<div class=card>${hd}<h2 style="font-size:clamp(20px,4vw,34px);margin:12px 0">${q[0]}</h2>${o.map((k,p)=>`<button class=opt style="background:${OC[p]}" onclick="pick(${k})">${SH[p]} ${q[1+k]}</button>`).join('')}<p class=c style="font-size:15px">ประเภทโจทย์: ${TY[q[6]]}</p></div>`;
+ else if(G.ph=='fb'){const x=G.last;app.innerHTML=`<div class=card>${hd}<div class=c><div class=big>${x.k<0?'⏰':x.ok?'✅':'❌'}</div><h2>${x.k<0?'หมดเวลา':x.ok?'ถูกต้อง! +'+x.pts:'ยังไม่ถูก ไม่เป็นไร!'}</h2></div>${o.map((k,p)=>`<button class="opt ${k==0?'ok':k==x.k?'sel':'no'}" style="background:${OC[p]}" disabled>${SH[p]} ${q[1+k]}</button>`).join('')}<div style="background:#fff7cc;border:3px solid #1f2d4d;border-radius:14px;padding:12px"><p>💡 <b>เฉลย:</b> ${q[5]}</p></div><div class=c><button class="btn g" onclick="next()">${G.qi+1>=Q.length?'ดูผลสรุป 🏆':'ต่อไป ▶'}</button></div></div>`}
+ else end()}
+function end(){const tot=Q.length*5,weak=G.lv.map((v,i)=>v<=2?LV[i][2]:null).filter(Boolean);
+ app.innerHTML=`<div class="card c"><div class=big>🏆</div><h1>ภารกิจสำเร็จ! คะแนน ${G.pts}</h1><h2>ตอบถูก ${G.ok}/${Q.length} ข้อ</h2><p id=st>กำลังบันทึกคะแนน...</p></div>
+ <div class=card><h2>📊 ความเข้าใจรายด่าน</h2>${LV.map((l,i)=>`<div class=lb><b>${l[0]} ${l[2]}</b><i style="background:${G.lv[i]<=2?'#ff7043':'#43c463'};width:${G.lv[i]*10}%"></i><b>${G.lv[i]}/5</b></div>`).join('')}<p>${weak.length?'ควรทบทวน: <b>'+weak.join(', ')+'</b>':'เยี่ยมมาก! เข้าใจครบทุกเรื่อง 🎉'}</p></div>
+ ${G.wrong.length?`<div class=card><h2>ทบทวนข้อที่ยังไม่ถูก</h2>${G.wrong.map(i=>`<details style="margin:8px 0"><summary><b>ข้อ ${i+1}:</b> ${Q[i][0]}</summary><p>✔ ${Q[i][1]}</p><p>💡 ${Q[i][5]}</p></details>`).join('')}</div>`:''}
+ <div class="card c"><button class="btn g" onclick="board()">🏆 ดูกระดานอันดับ</button><button class=btn onclick="start0()">เล่นอีกครั้ง</button></div>`;submit()}
+function start0(){G={qi:0,pts:0,ok:0,lv:[0,0,0,0,0,0],wrong:[],ph:'intro'};show()}
+async function submit(){const st=()=>$('#st'),b=me.b||{};if((b[CLS]||0)>=G.pts){st()&&(st().textContent='คะแนนครั้งนี้ไม่สูงกว่าคะแนนที่ดีที่สุดของคุณ ('+b[CLS]+') จึงไม่เปลี่ยนอันดับ');return}
+ try{await putRec({n:me.n,tm:me.tm,s:G.pts,c:G.ok,lv:G.lv,at:Date.now()});me.b={...b,[CLS]:G.pts};localStorage.msm_me=JSON.stringify(me);st()&&(st().textContent='✅ บันทึกคะแนนแล้ว')}
+ catch(e){st()&&(st().innerHTML='⚠️ บันทึกคะแนนไม่สำเร็จ <button class=btn style="font-size:16px;padding:6px 12px" onclick="submit()">ลองใหม่</button>')}}
+// ===== กระดานอันดับ (รีเฟรชอัตโนมัติทุก 15 วินาที) =====
+async function board(proj){clearInterval(iv);clearInterval(bv);const draw=async()=>{let o;try{o=await getLB()}catch(e){app.innerHTML=`<div class="card c"><h2>โหลดอันดับไม่สำเร็จ</h2><button class=btn onclick="board(${!!proj})">ลองใหม่</button>${proj?'':'<button class=btn onclick="landing()">กลับ</button>'}</div>`;return}
+ const ps=Object.entries(o).map(([id,v])=>({id,...v})).filter(p=>p&&p.n).sort((a,b)=>b.s-a.s),tm=TN.map((n,i)=>({i,n,m:ps.filter(p=>p.tm==i)})).map(x=>({...x,s:x.m.reduce((a,p)=>a+p.s,0)})).filter(x=>x.m.length).sort((a,b)=>b.s-a.s),mx=Math.max(1,...tm.map(x=>x.s)),
+ lvAvg=LV.map((l,i)=>{const v=ps.filter(p=>p.lv).map(p=>+p.lv[i]||0);return v.length?v.reduce((a,b)=>a+b,0)/v.length/5:0}),md=['🥇','🥈','🥉'];
+ app.innerHTML=`<div class=card><div class=row><h2>🏆 กระดานอันดับ ห้อง ${esc(CLS)}</h2><span class=tag>ผู้เล่น ${ps.length} คน</span></div>
+ <h2 style="font-size:24px;margin-top:10px">ทีม (รวมคะแนนสมาชิก)</h2>${tm.map((x,r)=>`<div class=lb><b>${md[r]||r+1+'.'} ${x.n} <small>(${x.m.length} คน)</small></b><i style="background:${TC[x.i]};width:${Math.max(4,x.s/mx*45)}%"></i><b>${x.s}</b></div>`).join('')||'<p>ยังไม่มีคะแนน เป็นคนแรกเลย!</p>'}
+ <h2 style="font-size:24px;margin-top:10px">10 อันดับบุคคล</h2>${ps.slice(0,10).map((p,r)=>`<div class=lb style="${p.id==me.id?'background:#fff7cc;border-radius:10px;':''}"><b>${md[r]||r+1+'.'} ${esc(p.n)} <small>${TN[p.tm]||''}</small></b><b>${p.s}</b></div>`).join('')}
+ <h2 style="font-size:24px;margin-top:10px">ความเข้าใจรายด่านของทั้งห้อง</h2>${LV.map((l,i)=>`<div class=lb><b>${l[0]} ${l[2]}</b><i style="background:${lvAvg[i]<.6?'#ff7043':'#43c463'};width:${lvAvg[i]*45}%"></i><b>${Math.round(lvAvg[i]*100)}%</b></div>`).join('')}
+ ${proj?'':'<div class=c><button class="btn b" onclick="board()">🔄 รีเฟรช</button><button class=btn onclick="landing()">← กลับ</button></div>'}</div>`};
+ await draw();bv=setInterval(draw,15000)}
+par.get('b')?board(true):landing();
 </script></body></html>
